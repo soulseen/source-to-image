@@ -276,7 +276,10 @@ func (builder *STI) Prepare(config *api.Config) error {
 
 	if len(config.RuntimeImage) > 0 {
 		startTime := time.Now()
-		dockerpkg.GetRuntimeImage(builder.runtimeDocker, config)
+		err := dockerpkg.GetRuntimeImage(builder.runtimeDocker, config)
+		if err != nil {
+			return err
+		}
 		builder.result.BuildInfo.Stages = api.RecordStageAndStepInfo(builder.result.BuildInfo.Stages, api.StagePullImages, api.StepPullRuntimeImage, startTime, time.Now())
 
 		if err != nil {
@@ -589,7 +592,10 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 	// this should be a quick inspect of the existing image. However, if
 	// the image has been deleted since the strategy was created, this will ensure
 	// it exists before executing a script on it.
-	builder.docker.CheckAndPullImage(config.BuilderImage)
+	_, err := builder.docker.CheckAndPullImage(config.BuilderImage)
+	if err != nil {
+		return err
+	}
 
 	// we can't invoke this method before (for example in New() method)
 	// because of later initialization of config.WorkingDir
@@ -714,7 +720,7 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 
 	c := dockerpkg.StreamContainerIO(errReader, &errOutput, func(s string) { glog.Info(s) })
 
-	err := builder.docker.RunContainer(opts)
+	err = builder.docker.RunContainer(opts)
 	if err != nil {
 		// Must wait for StreamContainerIO goroutine above to exit before reading errOutput.
 		<-c
